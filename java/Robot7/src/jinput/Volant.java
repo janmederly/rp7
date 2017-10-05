@@ -8,15 +8,19 @@ import net.java.games.input.Controller;
 import net.java.games.input.ControllerEnvironment;
 import net.java.games.input.Rumbler;
 
-public class VolantTest {
+public class Volant {
 	
 	private static final String CONTROLLER_NAME = "Force";
+
+    private static Rumbler[] rumblers;
+    
+    static boolean trasenie = false;
 
 	public static void main(String[] args) {
 
         Bluetooth bluetooth = Bluetooth.priprav();
 	    
-	    Thread zobrazovac = new Thread(new Zobrazovac(bluetooth));
+	    Thread zobrazovac = new Thread(new Prijimac(bluetooth));
 	    zobrazovac.setDaemon(true);
 	    zobrazovac.start();
 
@@ -24,22 +28,22 @@ public class VolantTest {
 		Controller[] ca = ce.getControllers();
 		Controller controller = null;
 		for (int i = 0; i < ca.length; i++) {
-			System.out.println("controller name: " + ca[i].getName());
+			System.out.println("Nazov controllera: " + ca[i].getName());
 			if (ca[i].getName().contains(CONTROLLER_NAME)) {
 				controller = ca[i];
 				break;
 			}
 		}
 		if (controller == null) {
-			System.err.println("Controller " + CONTROLLER_NAME + " not found, exiting.");
+			System.err.println("Controller " + CONTROLLER_NAME + " nebol najdeny.");
 			System.exit(0);
 		}
-		System.out.println("Subcontrollers: " + controller.getControllers().length);
 		Component[] components = controller.getComponents();
 		Component compVolant = null, compPlyn = null;
 		Component compSpiatocka = null, compDopredu = null;
-		Component compSenzor = null, compSenzorOn = null;
-		Component brake = null, pedals = null;
+		Component compSenzorOff = null, compSenzorOn = null;
+		Component compBrzda = null, compPedale = null;
+		Component compTrasenieOn = null, compTrasenieOff = null;
 		
 		for (Component c : components) {
 			System.out.println("--> " + c.getName() + ": " + c.getIdentifier());
@@ -53,43 +57,51 @@ public class VolantTest {
 			} else if (c.getIdentifier().equals(Identifier.Button._12)) {
 				compSpiatocka = c;
 			} else if (c.getIdentifier().equals(Identifier.Button._7)) {
-				compSenzor = c;
+				compSenzorOff = c;
 			} else if (c.getIdentifier().equals(Identifier.Button._8)) {
 				compSenzorOn = c;
 			} else if (c.getIdentifier().equals(Identifier.Axis.RZ)) {
-				brake = c;
+				compBrzda = c;
 			} else if (c.getIdentifier().equals(Identifier.Axis.SLIDER)) {
-				pedals = c;
+				compPedale = c;
+			} else if (c.getIdentifier().equals(Identifier.Button._3)) {		// O
+				compTrasenieOff = c;
+			} else if (c.getIdentifier().equals(Identifier.Button._1)) {		// X
+				compTrasenieOn = c;
 			}
 		}
-		//if (true) return;
+
 		System.out.println("Volant: " + compVolant);
 		System.out.println("Plyn: " + compPlyn);
-		System.out.println("Brake: " + brake);
-		System.out.println("Pedals: " + pedals);
+		System.out.println("Brake: " + compBrzda);
+		System.out.println("Pedals: " + compPedale);
 		System.out.println("Dopredu: " + compDopredu);
 		System.out.println("Spiatocka: " + compSpiatocka);
-		System.out.println("Senzor: " + compSenzor);
+		System.out.println("SenzorOff: " + compSenzorOff);
 		System.out.println("SenzorOn: " + compSenzorOn);
+		System.out.println("TrasenieOff: " + compTrasenieOff);
+		System.out.println("TrasenieOn: " + compTrasenieOn);
+		
+		rumblers = controller.getRumblers();
+        System.out.println("Nasiel " + rumblers.length + " rumblerov");
 
 	    //bluetooth.vypisy = false;
-
+        
 		for (;;) {
 			controller.poll();
 			System.out.println("Volant = " + compVolant.getPollData() 
 				+ ", Plyn = " + compPlyn.getPollData()
-				+ ", Brake = " + brake.getPollData()
-				+ ", Pedals = " + pedals.getPollData()
+				+ ", Brake = " + compBrzda.getPollData()
+				+ ", Pedals = " + compPedale.getPollData()
 				+ ", Dopredu = " + compDopredu.getPollData()
-				+ ", Senzor = " + compSenzor.getPollData()
+				+ ", Senzor = " + compSenzorOff.getPollData()
 				+ ", SenzorOn = " + compSenzorOn.getPollData()
-				+ ", Spiatocka = " + compSpiatocka.getPollData());
-			//Rumbler[] rumblers = controllers[controller].getRumblers();
-			if (pedals.getPollData() >= -1.2){
-				bluetooth.posli("Y" + cisloNaRetazec((int) (pedals.getPollData()*1000) ) );
-			}
+				+ ", Spiatocka = " + compSpiatocka.getPollData()
+				+ ", TrasenieOn = " + compTrasenieOn.getPollData()
+				+ ", TrasenieOff = " + compTrasenieOff.getPollData());
+			bluetooth.posli("Y" + cisloNaRetazec((int) (-compPedale.getPollData()*1000) ) );
 			bluetooth.posli("X" + cisloNaRetazec((int) (compVolant.getPollData()*1000) ) );
-			if (compSenzor.getPollData() != 0) {
+			if (compSenzorOff.getPollData() != 0) {
 				bluetooth.posli("G");
 			}
 			if (compSenzorOn.getPollData() != 0) {
@@ -100,6 +112,12 @@ public class VolantTest {
 			}
 			if (compSpiatocka.getPollData() != 0) {
 				bluetooth.posli("S");
+			}
+			if (compTrasenieOff.getPollData() != 0) {
+				trasenie = false;
+			}
+			if (compTrasenieOn.getPollData() != 0) {
+				trasenie = true;
 			}
 			
 			try {
@@ -129,5 +147,44 @@ public class VolantTest {
 //			
 //			
 	//	}
-	}
 
+	private static final float max = 10;
+	private static int posledny = -1;
+	
+	public static void akcelerometer(float ax, float ay, float az) {
+		float sucet = Math.abs((float) Math.sqrt(ax*ax + ay*ay + az*az) - 9.81f);
+		float rumble = sucet / max;
+		if (rumblers == null || rumblers.length < 4 || !trasenie) {
+			return;
+		}
+		
+		int ktory;
+		if (rumble > 0.7) {
+			ktory = 0;
+		} else if (rumble > 0.4) {
+			ktory = 2;
+		} else if (rumble > 0.1) {
+			ktory = 3;
+		} else {
+			ktory = -1;
+		}
+		System.out.println("AX=" + ax + ", AY=" + ay + ", AZ=" + az + " => sucet=" + sucet + ", rumble=" + rumble + ", p/k=" + posledny + "/" + ktory);
+		if (ktory == posledny) {
+			return;
+		}
+		if (posledny != -1) {
+			rumblers[posledny].rumble(0.0f);
+		}
+		if (ktory != -1) {
+			rumblers[ktory].rumble(1.0f);
+		}
+		if (rumble > 1.0) {
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+		posledny = ktory;
+	}
+}

@@ -1,6 +1,7 @@
-package jinput;
+package stare;
 
 import bluetooth.Bluetooth;
+import jinput.Prijimac;
 import net.java.games.input.Component;
 import net.java.games.input.Component.Identifier;
 import net.java.games.input.Component.Identifier.Axis;
@@ -12,7 +13,7 @@ public class Volant2 {
 	public static void main(String[] args) {
 	    Bluetooth bluetooth = Bluetooth.priprav();
 	    
-	    Thread zobrazovac = new Thread(new Zobrazovac(bluetooth));
+	    Thread zobrazovac = new Thread(new Prijimac(bluetooth));
 	    zobrazovac.setDaemon(true);
 	    zobrazovac.start();
 	    

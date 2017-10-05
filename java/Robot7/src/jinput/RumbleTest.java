@@ -26,7 +26,7 @@ public class RumbleTest {
             Rumbler[] rumblers = controllers[i].getRumblers();
             System.out.println("Found " + rumblers.length + " rumblers");
             for(int j=0;j<rumblers.length;j++) {
-                System.out.println("Rumbler " + rumblers[j].getAxisName() + " on axis " + rumblers[j].getAxisIdentifier());
+                System.out.println("Rumbler #" + j + ": " + rumblers[j] + "/" + rumblers[j].getAxisName() + " on axis " + rumblers[j].getAxisIdentifier());
                 System.out.println("Rumbling with intensity: " + 0.5f);
                 rumblers[j].rumble(0.5f);
                 try {
