@@ -6,13 +6,20 @@ import net.java.games.input.Component.Identifier;
 import net.java.games.input.Component.Identifier.Axis;
 import net.java.games.input.Controller;
 import net.java.games.input.ControllerEnvironment;
+import net.java.games.input.Rumbler;
 
 public class VolantTest {
 	
 	private static final String CONTROLLER_NAME = "Force";
 
 	public static void main(String[] args) {
-    
+
+        Bluetooth bluetooth = Bluetooth.priprav();
+	    
+	    Thread zobrazovac = new Thread(new Zobrazovac(bluetooth));
+	    zobrazovac.setDaemon(true);
+	    zobrazovac.start();
+
 		ControllerEnvironment ce = ControllerEnvironment.getDefaultEnvironment();
 		Controller[] ca = ce.getControllers();
 		Controller controller = null;
@@ -64,7 +71,9 @@ public class VolantTest {
 		System.out.println("Spiatocka: " + compSpiatocka);
 		System.out.println("Senzor: " + compSenzor);
 		System.out.println("SenzorOn: " + compSenzorOn);
-		
+
+	    //bluetooth.vypisy = false;
+
 		for (;;) {
 			controller.poll();
 			System.out.println("Volant = " + compVolant.getPollData() 
@@ -75,21 +84,24 @@ public class VolantTest {
 				+ ", Senzor = " + compSenzor.getPollData()
 				+ ", SenzorOn = " + compSenzorOn.getPollData()
 				+ ", Spiatocka = " + compSpiatocka.getPollData());
-//			bluetooth.posli("X" + cisloNaRetazec((int) (compVolant.getPollData()*1000) ) );
-//			bluetooth.posli("Y" + cisloNaRetazec((int) (compPlyn.getPollData()*1000) ) );
-//			if (compSenzor.getPollData() != 0) {
-//				bluetooth.posli("F");
-//			}
-//			if (compSenzorOn.getPollData() != 0) {
-//				bluetooth.posli("G");
-//			}
-//			if (compDopredu.getPollData() != 0) {
-//				bluetooth.posli("R");
-//			}
-//			if (compSpiatocka.getPollData() != 0) {
-//				bluetooth.posli("S");
-//			}
-//			
+			//Rumbler[] rumblers = controllers[controller].getRumblers();
+			if (pedals.getPollData() >= -1.2){
+				bluetooth.posli("Y" + cisloNaRetazec((int) (pedals.getPollData()*1000) ) );
+			}
+			bluetooth.posli("X" + cisloNaRetazec((int) (compVolant.getPollData()*1000) ) );
+			if (compSenzor.getPollData() != 0) {
+				bluetooth.posli("G");
+			}
+			if (compSenzorOn.getPollData() != 0) {
+				bluetooth.posli("F");
+			}
+			if (compDopredu.getPollData() != 0) {
+				bluetooth.posli("R");
+			}
+			if (compSpiatocka.getPollData() != 0) {
+				bluetooth.posli("S");
+			}
+			
 			try {
 				Thread.sleep(50);
 			} catch (InterruptedException e) {
@@ -112,4 +124,10 @@ public class VolantTest {
 		a[1] = (char) ((n / 1000) % 10 + 48);
 		return new String(a);
 	}
-}
+//	public static void naraz(String riadok){
+//		if (riadok.indexOf("a")){
+//			
+//			
+	//	}
+	}
+

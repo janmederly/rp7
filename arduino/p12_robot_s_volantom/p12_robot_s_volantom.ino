@@ -23,6 +23,8 @@ const int L_BRZDNE = 51;
 const int SPIATOCKA = 49;
 const int SILA_DENNYCH_SVETIEL = 20;
 
+void zapniAkcelerometer();
+void merajZrychlenie();
 
 void setup() {
   Serial.begin(115200);
@@ -54,6 +56,7 @@ void setup() {
   Serial.println("Piny nastavene.");
 
   Serial.println("Svetla zapnute.");
+  zapniAkcelerometer();  
 }
 
 const int DOPREDU = 1;
@@ -80,9 +83,15 @@ long rychlostMerania = 102;             // rýchlosť opakovania celého cyklu (
 
 float volantV = 0;
 float pedaleP = 0;
+float akcelerometerX = 0;               // zrýchlenie v osiach X, Y, Z
+float akcelerometerY = 0;
+float akcelerometerZ = 0;
 
-float NBA = 0;
-float NBB = 0;
+float airbagDZ = 8;                     //nastavenie najnizsej hodnoty pre airbagy pri smere dozadu
+float airbagDO = -8;                    //nastavenie najnizsej hodnoty pre airbagy pri smere dopredu
+long vypnutAirbag = 0;
+
+boolean zastaveny = false;
 
 int spiatocka = 0;
 
@@ -90,16 +99,21 @@ void loop() {
 
   unsigned long casStart = millis();
   svetla();
-  Serial.println(volantV);
+  merajZrychlenie();
+  
+  distance = 0;
   spracujPrikazZTabletu();
+  akcelerometer();
   if (zapnutyAsistentNarazu) {
     zistiVzdialenost();
-    if(distance > 30){
-      volant();
-    }else{
+    if (distance <= 30 && distance != 0) {
       zastav();
+      zastaveny = true;
     }
-  }else{
+  } else {
+    zastaveny = false;
+  }
+  if (!zastaveny) {
     volant();
   }
   unsigned long presielCas = millis() - casStart;
@@ -109,9 +123,36 @@ void loop() {
     Serial.println(esteCakat);
     esteCakat = 10;
   }
+  Serial.print("V:");
+  Serial.print(volantV);
+  Serial.print(" P:");
+  Serial.print(pedaleP);
+  Serial.print(" AN:");
+  Serial.print(zapnutyAsistentNarazu);
+  Serial.print(" D:");
+  Serial.print(distance);
+  Serial.print(" Z:");
+  Serial.print(zastaveny);
+  Serial.print(" AX:");
+  Serial.print(akcelerometerX);
+  Serial.print(" AY:");
+  Serial.print(akcelerometerY);
+  Serial.print(" AZ:");
+  Serial.print(akcelerometerZ);
+  Serial.println();
 }
 
-
+void akcelerometer() {
+  if (smer == DOZADU && akcelerometerY > airbagDZ) {
+    Serial.print("Naraz pri jazde dozadu. Zrychlenie = ");
+    Serial.println(akcelerometerY);
+    zastav();
+  } else if (smer == DOPREDU && akcelerometerY < airbagDO) {
+    Serial.print("Naraz pri jazde dopredu. Zrychlenie = ");
+    Serial.println(akcelerometerY);
+    zastav();
+  }
+}
 
 void spracujPrikazZTabletu() {
   Serial.print(".");
@@ -211,6 +252,7 @@ void spracujPrikazZTabletu() {
             a[4] = Serial.read();
             pedaleP = retazecNaCislo(a);
             pedaleP = pedaleP / 4;
+            pedaleP = pedaleP - pedaleP + pedaleP;
             Serial.print("P = ");
             Serial.println(pedaleP);
           }
@@ -221,62 +263,64 @@ void spracujPrikazZTabletu() {
 }
 
 void volant(){
+  float NBA;
+
   if (pedaleP >= 20){
     NBA = pedaleP;
-    if (volantV == 250 || volantV == -250){
-      if (volantV == 250){
+    if (volantV == 250 || volantV == -250) {
+      if (volantV == 250) {
         doprava();
         nastavRychlostMotorov(NBA);
-      }else{
+      } else {
         dolava();
         nastavRychlostMotorov(NBA);
       }
-    }else if (volantV != 250 && volantV >= 20 && pedaleP >= 20){
-     rychlostA(NBA);
-     rychlostB(NBA - volantV); 
-       digitalWrite(PP_SMEROVKA, HIGH);
-  digitalWrite(ZP_SMEROVKA, HIGH);
-  digitalWrite(PL_SMEROVKA, LOW);
-  digitalWrite(ZL_SMEROVKA, LOW);
-  digitalWrite(P_BRZDNE, LOW);
-  digitalWrite(L_BRZDNE, LOW);
-  digitalWrite(SPIATOCKA, LOW);
-    }else if (volantV <= -20 && volantV != -250){
-     rychlostA(NBA + volantV);
-     rychlostB(NBA);
+    } else if (volantV != 250 && volantV >= 10 && pedaleP >= 20) {
+      rychlostA(NBA);
+      rychlostB(NBA - volantV); 
+      digitalWrite(PP_SMEROVKA, HIGH);
+      digitalWrite(ZP_SMEROVKA, HIGH);
+      digitalWrite(PL_SMEROVKA, LOW);
+      digitalWrite(ZL_SMEROVKA, LOW);
+      digitalWrite(P_BRZDNE, LOW);
+      digitalWrite(L_BRZDNE, LOW);
+      digitalWrite(SPIATOCKA, LOW);
+    } else if (volantV <= -20 && volantV != -250) {
+      rychlostA(NBA + volantV);
+      rychlostB(NBA);
       digitalWrite(PL_SMEROVKA, HIGH);
-  digitalWrite(ZL_SMEROVKA, HIGH);
-  digitalWrite(PP_SMEROVKA, LOW);
-  digitalWrite(ZP_SMEROVKA, LOW);
-  digitalWrite(P_BRZDNE, LOW);
-  digitalWrite(L_BRZDNE, LOW);
-  digitalWrite(SPIATOCKA, LOW);
-   }else if (spiatocka == 0){
-     dopredu();
-     rychlostA(NBA);
-     rychlostB(NBA);
+      digitalWrite(ZL_SMEROVKA, HIGH);
       digitalWrite(PP_SMEROVKA, LOW);
-  digitalWrite(PL_SMEROVKA, LOW);
-  digitalWrite(ZP_SMEROVKA, LOW);
-  digitalWrite(ZL_SMEROVKA, LOW);
-  digitalWrite(P_BRZDNE, LOW);
-  digitalWrite(L_BRZDNE, LOW);
-  digitalWrite(SPIATOCKA, LOW);
-   }else if (spiatocka == 1){
-     dozadu();
-     rychlostA(NBA);
-     rychlostB(NBA);
-     digitalWrite(SPIATOCKA, HIGH);
-  digitalWrite(PP_SMEROVKA, LOW);
-  digitalWrite(PL_SMEROVKA, LOW);
-  digitalWrite(ZP_SMEROVKA, LOW);
-  digitalWrite(ZL_SMEROVKA, LOW);
-  digitalWrite(P_BRZDNE, LOW);
-  digitalWrite(L_BRZDNE, LOW);
-   }
-  
-  }else zastav();
-  
+      digitalWrite(ZP_SMEROVKA, LOW);
+      digitalWrite(P_BRZDNE, LOW);
+      digitalWrite(L_BRZDNE, LOW);
+      digitalWrite(SPIATOCKA, LOW);
+    } else if (spiatocka == 0) {
+      dopredu();
+      rychlostA(NBA);
+      rychlostB(NBA);
+      digitalWrite(PP_SMEROVKA, LOW);
+      digitalWrite(PL_SMEROVKA, LOW);
+      digitalWrite(ZP_SMEROVKA, LOW);
+      digitalWrite(ZL_SMEROVKA, LOW);
+      digitalWrite(P_BRZDNE, LOW);
+      digitalWrite(L_BRZDNE, LOW);
+      digitalWrite(SPIATOCKA, LOW);
+    } else if (spiatocka == 1){
+      dozadu();
+      rychlostA(NBA);
+      rychlostB(NBA);
+      digitalWrite(SPIATOCKA, HIGH);
+      digitalWrite(PP_SMEROVKA, LOW);
+      digitalWrite(PL_SMEROVKA, LOW);
+      digitalWrite(ZP_SMEROVKA, LOW);
+      digitalWrite(ZL_SMEROVKA, LOW);
+      digitalWrite(P_BRZDNE, LOW);
+      digitalWrite(L_BRZDNE, LOW);
+    }
+  } else {
+    zastav();
+  }
 }
 
 
@@ -292,29 +336,29 @@ int retazecNaCislo(char* a) {
   return vratCislo;
 }
 
-void testujVzdialenost() {
-  zistiVzdialenost();
-  if (distance >= 400 || distance <= 0) {
-//    rychlost = 0;
-  } else if (distance < 50) {
-     zastav();
-  } else {
-     if (distance < kedyZastat && smer == DOPREDU) {
-        zastav();
-     }
-  }
-}
+//void testujVzdialenost() {
+//  zistiVzdialenost();
+//  if (distance >= 400 || distance <= 0) {
+////    rychlost = 0;
+//  } else if (distance < 50) {
+//     zastav();
+//  } else {
+//     if (distance < kedyZastat && smer == DOPREDU) {
+//        zastav();
+//     }
+//  }
+//}
 
-void testujVzdialenostDZ() {
-  zistiVzdialenostDZ();
-  if (distanceDZ > 0 && distanceDZ < 50) {
-    Serial.print(distanceDZ);
-    Serial.println(" cm POZOR PREKAZKA BLIZSIE AKO 50 CM BRZDIT ALEBO ZMENIT SMER ");
-    if (distanceDZ < kedyZastat) {
-      zastav();
-    }
-  }
-}
+//void testujVzdialenostDZ() {
+//  zistiVzdialenostDZ();
+//  if (distanceDZ > 0 && distanceDZ < 50) {
+//    Serial.print(distanceDZ);
+//    Serial.println(" cm POZOR PREKAZKA BLIZSIE AKO 50 CM BRZDIT ALEBO ZMENIT SMER ");
+//    if (distanceDZ < kedyZastat) {
+//      zastav();
+//    }
+//  }
+//}
 
 
 void svetla() {
@@ -418,6 +462,7 @@ void zistiVzdialenostDZ() {
 }
 
 void zastav() {
+  Serial.println("Zastavujem");
   vypniA();
   vypniB();
   digitalWrite(SPIATOCKA, LOW);

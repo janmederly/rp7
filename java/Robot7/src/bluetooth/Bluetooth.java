@@ -17,7 +17,7 @@ public class Bluetooth {
 	private BufferedReader reader;
 	private StreamConnection streamConnection;
 	
-	private boolean vypisy = true;
+	public boolean vypisy = true;
 	
 	private Bluetooth(String url) throws IOException {
 		System.out.println("Pripajam sa na " + url);
